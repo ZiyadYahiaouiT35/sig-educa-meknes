@@ -91,10 +91,50 @@ async function init() {
             }
         } catch (e) { }
 
-        document.getElementById('loading-text').innerText = "Chargement des données CSV...";
+        document.getElementById('loading-indicator').classList.add('hidden');
+        document.getElementById('dashboard-content').classList.remove('hidden');
 
-        Papa.parse("schools_updated.csv", {
-            download: true,
+    } catch (error) {
+        console.error(error);
+        document.getElementById('loading-text').innerText = "Erreur de chargement.";
+    }
+}
+
+// Security / Decryption Logic
+const loginBtn = document.getElementById('login-btn');
+const loginKeyInput = document.getElementById('login-key');
+const loginError = document.getElementById('login-error');
+const loginOverlay = document.getElementById('login-overlay');
+const loginSpinner = document.getElementById('login-spinner');
+const loginBtnText = document.getElementById('login-btn-text');
+
+loginBtn.addEventListener('click', async () => {
+    const key = loginKeyInput.value.trim();
+    if (!key) return;
+
+    loginError.innerText = "";
+    loginBtn.disabled = true;
+    loginSpinner.classList.remove('hidden');
+    loginBtnText.classList.add('hidden');
+
+    try {
+        const response = await fetch("data.enc");
+        if (!response.ok) throw new Error("Fichier chiffré introuvable");
+        const encryptedData = await response.text();
+
+        // Decrypt using CryptoJS
+        const decrypted = CryptoJS.AES.decrypt(encryptedData, key);
+        const decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
+
+        if (!decryptedString) {
+            throw new Error("Clé incorrecte");
+        }
+
+        // Hide login and parse data
+        loginOverlay.style.opacity = "0";
+        setTimeout(() => loginOverlay.classList.add('hidden'), 500);
+
+        Papa.parse(decryptedString, {
             header: true,
             skipEmptyLines: true,
             complete: function (results) {
@@ -102,14 +142,22 @@ async function init() {
             },
             error: function (err) {
                 console.error("CSV Parse Error:", err);
+                alert("Erreur de format des données.");
             }
         });
 
-    } catch (error) {
-        console.error(error);
-        document.getElementById('loading-text').innerText = "Error loading data.";
+    } catch (err) {
+        loginError.innerText = "Clé incorrecte ou erreur réseau.";
+        loginBtn.disabled = false;
+        loginSpinner.classList.add('hidden');
+        loginBtnText.classList.remove('hidden');
     }
-}
+});
+
+// Allow Enter key to submit
+loginKeyInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') loginBtn.click();
+});
 
 function processCSVData(data) {
     const parentCycles = {};
@@ -252,9 +300,6 @@ function processCSVData(data) {
 
     // Initialize Heatmap Layer
     heatLayer = L.heatLayer(heatPoints, {radius: 25, blur: 15, maxZoom: 15});
-
-    document.getElementById('loading-indicator').classList.add('hidden');
-    document.getElementById('dashboard-content').classList.remove('hidden');
 
     updateDashboard(); // Initial calculation
 }

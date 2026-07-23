@@ -15,6 +15,20 @@
 </head>
 
 <body>
+    <!-- Login Modal -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2><i class="fa-solid fa-lock" style="color: #facc15;"></i> Accès Sécurisé</h2>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px;">Veuillez entrer la clé de déchiffrement pour accéder aux données.</p>
+            <input type="password" id="login-key" placeholder="Clé secrète..." autocomplete="off">
+            <button id="login-btn">
+                <span id="login-btn-text">Déchiffrer</span>
+                <div id="login-spinner" class="spinner hidden" style="width: 20px; height: 20px; border-width: 2px;"></div>
+            </button>
+            <div id="login-error"></div>
+        </div>
+    </div>
+
     <div id="app-container">
         <!-- Sidebar -->
         <aside id="sidebar" class="glass-panel">
@@ -124,6 +138,7 @@
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="app.js?v=5"></script>
 </body>
 
