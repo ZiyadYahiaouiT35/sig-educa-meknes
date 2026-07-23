@@ -248,13 +248,16 @@ function processCSVData(data) {
     });
 
     if (buffers.primary.length > 0) {
-        L.geoJSON(turf.featureCollection(buffers.primary), { style: { color: primaryColor, weight: 0, fillOpacity: 0.15 }, interactive: false }).addTo(bufferPrimaryLayer);
+        const dissolvedPrimary = turf.dissolve(turf.featureCollection(buffers.primary));
+        L.geoJSON(dissolvedPrimary, { style: { color: primaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferPrimaryLayer);
     }
     if (buffers.secondary.length > 0) {
-        L.geoJSON(turf.featureCollection(buffers.secondary), { style: { color: secondaryColor, weight: 0, fillOpacity: 0.15 }, interactive: false }).addTo(bufferSecondaryLayer);
+        const dissolvedSecondary = turf.dissolve(turf.featureCollection(buffers.secondary));
+        L.geoJSON(dissolvedSecondary, { style: { color: secondaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferSecondaryLayer);
     }
     if (buffers.high.length > 0) {
-        L.geoJSON(turf.featureCollection(buffers.high), { style: { color: highColor, weight: 0, fillOpacity: 0.15 }, interactive: false }).addTo(bufferHighLayer);
+        const dissolvedHigh = turf.dissolve(turf.featureCollection(buffers.high));
+        L.geoJSON(dissolvedHigh, { style: { color: highColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferHighLayer);
     }
 
     // Initialize Heatmap Layer
