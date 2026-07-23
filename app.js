@@ -421,3 +421,20 @@ document.getElementById('toggle-heatmap').addEventListener('change', e => {
 });
 
 init();
+
+// Mobile UI Toggle Logic
+const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+const sidebar = document.getElementById('sidebar');
+const mobileOverlay = document.getElementById('mobile-overlay');
+
+if (mobileMenuBtn && sidebar && mobileOverlay) {
+    mobileMenuBtn.addEventListener('click', () => {
+        sidebar.classList.add('show-sidebar');
+        mobileOverlay.classList.add('active');
+    });
+
+    mobileOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('show-sidebar');
+        mobileOverlay.classList.remove('active');
+    });
+}
