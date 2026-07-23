@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse de la Couverture Éducative de Meknès</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+
+<body>
+    <div id="app-container">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="glass-panel">
+            <header>
+                <h1><i class="fa-solid fa-graduation-cap"></i> Meknès Éducation</h1>
+                <p>Analyse de la Couverture et de la Densité</p>
+            </header>
+
+            <div class="search-container" style="padding: 0 1.5rem 1rem 1.5rem;">
+                <input type="text" id="school-search" placeholder="Rechercher des écoles (ex. الخنساء)..." dir="rtl" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; outline: none;">
+                <ul id="search-results" class="search-results hidden" style="list-style: none; padding: 0; margin-top: 5px; background: rgba(15, 23, 42, 0.95); border-radius: 8px; max-height: 200px; overflow-y: auto; direction: rtl; text-align: right; position: absolute; width: calc(100% - 3rem); z-index: 1000;"></ul>
+            </div>
+
+            <div class="status-container">
+                <div id="loading-indicator" class="loading-state">
+                    <div class="spinner"></div>
+                    <p id="loading-text">Chargement des données...</p>
+                </div>
+            </div>
+
+            <div id="dashboard-content" class="hidden">
+                <section class="stats-grid">
+                    <div class="stat-card">
+                        <i class="fa-solid fa-eye" style="color: #3b82f6;"></i>
+                        <div class="stat-info">
+                            <span class="stat-value" id="visible-schools">0</span>
+                            <span class="stat-label">Écoles Visibles</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fa-solid fa-bed" style="color: #facc15;"></i>
+                        <div class="stat-info">
+                            <span class="stat-value" id="visible-capacity">0</span>
+                            <span class="stat-label">Capacité Visible</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="controls-section">
+                    <h3>Contrôles de la Carte</h3>
+                    <div class="toggle-group">
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-border" checked>
+                            <span class="slider"></span> Frontière de la Préfecture
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-habitable" checked>
+                            <span class="slider"></span> Zones Habitables
+                        </label>
+                        <hr>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-schools-primary" checked>
+                            <span class="slider" style="background-color: #3b82f6;"></span> Écoles Primaires
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-schools-secondary" checked>
+                            <span class="slider" style="background-color: #22c55e;"></span> Collèges
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-schools-high" checked>
+                            <span class="slider" style="background-color: #ef4444;"></span> Lycées
+                        </label>
+                        <hr>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-buffers-primary">
+                            <span class="slider" style="background-color: #3b82f6;"></span> Couverture Primaire
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-buffers-secondary">
+                            <span class="slider" style="background-color: #22c55e;"></span> Couverture Collège
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-buffers-high">
+                            <span class="slider" style="background-color: #ef4444;"></span> Couverture Lycée
+                        </label>
+                        <hr>
+                        <label class="toggle"
+                            style="background: rgba(250, 204, 21, 0.1); padding: 5px; border-radius: 5px;">
+                            <input type="checkbox" id="toggle-internal-residence">
+                            <span class="slider" style="background-color: #facc15;"></span> Mettre en évidence l'Internat
+                        </label>
+                        <hr>
+                        <label class="toggle"
+                            style="background: rgba(239, 68, 68, 0.1); padding: 5px; border-radius: 5px;">
+                            <input type="checkbox" id="toggle-heatmap">
+                            <span class="slider" style="background-color: #ef4444;"></span> Carte de Densité
+                        </label>
+                    </div>
+                </section>
+
+
+            </div>
+
+            <footer style="margin-top: auto;">
+                <p>Données fournies par OpenStreetMap</p>
+                <p>Rayon : 1.5km - 3.5km</p>
+            </footer>
+        </aside>
+
+        <!-- Map Container -->
+        <main id="map"></main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="app.js?v=5"></script>
+</body>
+
+</html>
