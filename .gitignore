@@ -4,3 +4,10 @@
 .DS_Store
 __pycache__/
 node_modules/
+encrypt.py
+fetch_data.py
+process.ps1
+process2.ps1
+requirements.txt
+docker-compose.yml
+Dockerfile
