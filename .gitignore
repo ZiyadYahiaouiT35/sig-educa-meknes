@@ -1,6 +1,11 @@
 *.csv
 *.enc
 !data.enc
+*.py
+*.ps1
+*.txt
 .DS_Store
 __pycache__/
 node_modules/
+Dockerfile
+docker-compose.yml

@@ -15,6 +15,9 @@ legend.onAdd = function (map) {
                 <li style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-shield-halved" style="color: #8b5cf6; font-size: 14px;"></i> Académie Militaire</li>
                 <li style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-eye-slash" style="color: #06b6d4; font-size: 14px;"></i> Institut pour Malvoyants</li>
                 <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 12px; border-radius: 50%; border: 2px solid #facc15; background-color: transparent; display: inline-block;"></span> Internat</li>
+                <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 3px; background-color: #0f172a; display: inline-block;"></span> Frontière Préfecture</li>
+                <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 3px; background-color: #0284c7; border-bottom: 2px dashed #38bdf8; display: inline-block;"></span> Ville de Meknès</li>
+                <li style="display: flex; align-items: center; gap: 8px;"><span style="width: 12px; height: 3px; background-color: #64748b; border-bottom: 2px dotted #cbd5e1; display: inline-block;"></span> Communes Rur./Urb.</li>
             </ul>
         </div>
     `;
@@ -42,6 +45,9 @@ dpenMarker.bindPopup('<div style="direction: rtl; text-align: center;"><strong>�
 
 const borderLayer = L.featureGroup().addTo(map);
 const habitableLayer = L.featureGroup().addTo(map);
+const cityLayer = L.featureGroup().addTo(map);
+const communesLayer = L.featureGroup().addTo(map);
+const routeLayer = L.featureGroup().addTo(map);
 
 const schoolsPrimaryLayer = L.featureGroup().addTo(map);
 const schoolsSecondaryLayer = L.featureGroup().addTo(map);
@@ -83,13 +89,70 @@ async function init() {
             if (resResponse.ok) {
                 const resData = await resResponse.json();
                 const residentialGeoJSON = osmtogeojson(resData);
-                L.geoJSON(residentialGeoJSON, {
-                    filter: function(feature) { return feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon'); },
-                    style: { color: '#ef4444', weight: 1, fillOpacity: 0.6 },
+                let dissolvedRes = residentialGeoJSON;
+                try {
+                    const polys = residentialGeoJSON.features.filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'));
+                    if (polys.length > 0) {
+                        dissolvedRes = turf.dissolve(turf.featureCollection(polys));
+                    }
+                } catch (e) { console.warn("Dissolve residential error:", e); }
+                L.geoJSON(dissolvedRes, {
+                    style: { color: '#ef4444', weight: 0.5, fillOpacity: 0.25 },
                     interactive: false
                 }).addTo(habitableLayer);
             }
         } catch (e) { }
+
+        document.getElementById('loading-text').innerText = "Chargement des limites de la ville...";
+        try {
+            const cityResponse = await fetch("city.json");
+            if (cityResponse.ok) {
+                const cityData = await cityResponse.json();
+                const cityGeoJSON = osmtogeojson(cityData);
+                cityGeoJSON.features.forEach(f => {
+                    if (f.geometry && f.geometry.type === 'Polygon' && f.geometry.coordinates.length > 1) {
+                        f.geometry.coordinates = [f.geometry.coordinates[0]];
+                    } else if (f.geometry && f.geometry.type === 'MultiPolygon') {
+                        f.geometry.coordinates = f.geometry.coordinates.map(poly => poly.length > 0 ? [poly[0]] : poly);
+                    }
+                });
+                L.geoJSON(cityGeoJSON, {
+                    filter: function(feature) { return feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon' || feature.geometry.type === 'LineString'); },
+                    style: { color: '#0284c7', weight: 3, dashArray: '8, 6', fill: false, opacity: 0.85 },
+                    interactive: false
+                }).addTo(cityLayer);
+            }
+        } catch (e) { console.warn("City border error:", e); }
+
+        document.getElementById('loading-text').innerText = "Chargement des communes...";
+        try {
+            const commResponse = await fetch("communes.json");
+            if (commResponse.ok) {
+                const commData = await commResponse.json();
+                const commGeoJSON = osmtogeojson(commData);
+                L.geoJSON(commGeoJSON, {
+                    filter: function(feature) {
+                        if (!feature.geometry || !(feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon' || feature.geometry.type === 'LineString')) return false;
+                        const str = JSON.stringify(feature).toLowerCase();
+                        if (str.includes('2561177') || str.includes('2561178') || str.includes('machouar') || str.includes('المشور')) return false;
+                        if (feature.properties && feature.properties.tags) {
+                            const name = (feature.properties.tags['name:fr'] || feature.properties.tags['name'] || '').toLowerCase();
+                            if (name === 'meknès' || name === 'meknes' || name.includes('machouar') || name.includes('stinia')) return false;
+                        }
+                        return true;
+                    },
+                    style: { color: '#64748b', weight: 1.5, dashArray: '4, 4', fill: false, opacity: 0.6 },
+                    onEachFeature: function(feature, layer) {
+                        if (feature.properties && feature.properties.tags) {
+                            const name = feature.properties.tags['name:fr'] || feature.properties.tags['name'] || feature.properties.tags['name:ar'];
+                            if (name) {
+                                layer.bindTooltip(name, { sticky: true, className: 'commune-tooltip' });
+                            }
+                        }
+                    }
+                }).addTo(communesLayer);
+            }
+        } catch (e) { console.warn("Communes border error:", e); }
 
         document.getElementById('loading-indicator').classList.add('hidden');
         document.getElementById('dashboard-content').classList.remove('hidden');
@@ -158,6 +221,8 @@ function processCSVData(data) {
         const cycle = row['السلك التعليمي'];
         const capacity = parseInt(row['Internal_Residence_Capacity']) || 0;
         const latinName = row['Latin_Name'] || "";
+        const latinAddress = row['Latin_Address'] || "";
+        const phone = row['Phone_Number'] || row['Phone'] || "";
         
         const tier = parentCycles[parent] || 'primary';
         let color = primaryColor;
@@ -225,16 +290,49 @@ function processCSVData(data) {
             });
         }
 
-        marker.bindPopup(`
-            <div class="popup-content" style="direction: rtl; text-align: right;">
-                <h3 style="margin-bottom: 5px;">${markerName}</h3>
-                ${latinName ? `<p style="direction: ltr; text-align: left; font-weight: bold; margin-bottom: 5px;">${latinName}</p>` : ''}
-                <p><strong>Établissement Mère:</strong> ${parent}</p>
-                <p><strong>Adresse:</strong> ${row['العنوان']}</p>
-                <p><strong>Cycle:</strong> ${cycle}</p>
-                <p><strong>Capacité de l'Internat:</strong> ${capacity}</p>
+        const popupHTML = `
+            <div class="popup-content" style="direction: rtl; text-align: right; font-family: 'Inter', 'Segoe UI', sans-serif; min-width: 260px; color: #f8fafc;">
+                <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; color: #ffffff; border-bottom: 2px solid ${color}; padding-bottom: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${markerName}</h3>
+                ${latinName ? `<div style="direction: ltr; text-align: left; font-weight: 600; font-size: 0.9rem; color: #cbd5e1; margin-bottom: 10px;">${latinName}</div>` : ''}
+                
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; color: #e2e8f0; margin-top: 8px;">
+                    <div style="display: flex; align-items: baseline; gap: 6px;">
+                        <strong style="color: #94a3b8; min-width: 95px;">المؤسسة الأم:</strong> 
+                        <span style="font-weight: 500; color: #ffffff;">${parent}</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 6px;">
+                        <strong style="color: #94a3b8; min-width: 95px;">العنوان (عربي):</strong> 
+                        <span style="color: #cbd5e1;">${row['العنوان'] || '---'}</span>
+                    </div>
+                    ${latinAddress ? `
+                    <div style="direction: ltr; text-align: left; background: rgba(59, 130, 246, 0.15); padding: 8px 10px; border-radius: 6px; border-left: 3px solid #3b82f6; margin: 4px 0;">
+                        <div style="font-size: 0.75rem; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;"><i class="fa-solid fa-map-location-dot" style="color: #60a5fa; margin-right: 4px;"></i> Adresse Latin</div>
+                        <div style="font-size: 0.85rem; color: #ffffff; font-weight: 500;">${latinAddress}</div>
+                    </div>` : ''}
+                    ${phone ? `
+                    <div style="direction: ltr; text-align: left; display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.15); padding: 8px 10px; border-radius: 6px; border-left: 3px solid #22c55e; margin: 2px 0;">
+                        <i class="fa-solid fa-phone" style="color: #4ade80;"></i>
+                        <strong style="color: #86efac; font-size: 0.85rem;">Tél:</strong> 
+                        <a href="tel:${phone}" style="color: #ffffff; font-weight: 600; text-decoration: none;">${phone}</a>
+                    </div>` : ''}
+                    <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 4px;">
+                        <strong style="color: #94a3b8; min-width: 95px;">السلك التعليمي:</strong> 
+                        <span style="background: rgba(255, 255, 255, 0.15); color: #ffffff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">${cycle}</span>
+                    </div>
+                    ${capacity > 0 ? `
+                    <div style="display: flex; align-items: center; gap: 6px; background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.3); padding: 6px 10px; border-radius: 6px; color: #fde047; font-weight: bold; margin-top: 4px;">
+                        <i class="fa-solid fa-bed" style="color: #facc15;"></i> capacité de l'internat: ${capacity}
+                    </div>` : ''}
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.15); display: flex; justify-content: center;">
+                        <button onclick="drawRouteToAdmin(${lat}, ${lng}, '${markerName.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" style="width: 100%; padding: 10px 14px; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4); transition: all 0.2s;">
+                            <i class="fa-solid fa-route" style="color: #38bdf8; font-size: 1rem;"></i>
+                            <span>مسار نحو المديرية / Route vers la Direction</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-        `);
+        `;
+        marker.bindPopup(popupHTML);
 
         marker.addTo(targetLayer);
         allMarkers.push(marker);
@@ -345,6 +443,8 @@ map.on('layerremove', updateDashboard);
 // UI Toggles
 document.getElementById('toggle-border').addEventListener('change', e => e.target.checked ? map.addLayer(borderLayer) : map.removeLayer(borderLayer));
 document.getElementById('toggle-habitable').addEventListener('change', e => e.target.checked ? map.addLayer(habitableLayer) : map.removeLayer(habitableLayer));
+document.getElementById('toggle-city').addEventListener('change', e => e.target.checked ? map.addLayer(cityLayer) : map.removeLayer(cityLayer));
+document.getElementById('toggle-communes').addEventListener('change', e => e.target.checked ? map.addLayer(communesLayer) : map.removeLayer(communesLayer));
 
 document.getElementById('toggle-schools-primary').addEventListener('change', e => e.target.checked ? map.addLayer(schoolsPrimaryLayer) : map.removeLayer(schoolsPrimaryLayer));
 document.getElementById('toggle-schools-secondary').addEventListener('change', e => e.target.checked ? map.addLayer(schoolsSecondaryLayer) : map.removeLayer(schoolsSecondaryLayer));
@@ -441,3 +541,98 @@ if (mobileMenuBtn && sidebar && mobileOverlay) {
         mobileOverlay.classList.remove('active');
     });
 }
+
+// Route Construction to Administration (DPEN)
+async function drawRouteToAdmin(schoolLat, schoolLng, schoolName) {
+    const dpenLat = 33.899868044613605;
+    const dpenLng = -5.526798366916536;
+    
+    routeLayer.clearLayers();
+    map.closePopup();
+    
+    const routeCard = document.getElementById('route-card');
+    const routeDetails = document.getElementById('route-details');
+    if (routeCard && routeDetails) {
+        routeCard.classList.remove('hidden');
+        routeDetails.innerHTML = `<div style="display: flex; align-items: center; gap: 10px; color: #38bdf8; padding: 10px 0;"><div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div> <span>جاري حساب المسار... / Calcul de l'itinéraire...</span></div>`;
+    }
+    
+    try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${schoolLng},${schoolLat};${dpenLng},${dpenLat}?overview=full&geometries=geojson`;
+        const response = await fetch(url);
+        let distanceKm = 0;
+        let durationMin = 0;
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                distanceKm = (route.distance / 1000).toFixed(1);
+                durationMin = Math.round(route.duration / 60);
+                
+                // Outer glow
+                L.geoJSON(route.geometry, {
+                    style: { color: '#38bdf8', weight: 12, opacity: 0.35, lineCap: 'round', lineJoin: 'round' },
+                    interactive: false
+                }).addTo(routeLayer);
+                
+                // Main route line
+                L.geoJSON(route.geometry, {
+                    style: { color: '#0284c7', weight: 5, opacity: 0.95, dashArray: '12, 10', lineCap: 'round', lineJoin: 'round' },
+                    interactive: false
+                }).addTo(routeLayer);
+            }
+        }
+        
+        // Fallback if OSRM fails or returns no route
+        if (routeLayer.getLayers().length === 0) {
+            const line = L.polyline([[schoolLat, schoolLng], [dpenLat, dpenLng]], {
+                color: '#0284c7', weight: 5, opacity: 0.9, dashArray: '12, 10'
+            }).addTo(routeLayer);
+            distanceKm = (turf.distance([schoolLng, schoolLat], [dpenLng, dpenLat])).toFixed(1);
+            durationMin = Math.round(distanceKm * 2);
+        }
+        
+        // Add start and end pulsing circle markers
+        L.circleMarker([schoolLat, schoolLng], {
+            radius: 8, fillColor: '#22c55e', color: '#ffffff', weight: 2, fillOpacity: 1
+        }).addTo(routeLayer).bindTooltip(`<b>الإنطلاق:</b> ${schoolName}`, { direction: 'top', sticky: true });
+        
+        L.circleMarker([dpenLat, dpenLng], {
+            radius: 9, fillColor: '#ef4444', color: '#ffffff', weight: 2, fillOpacity: 1
+        }).addTo(routeLayer).bindTooltip('<b>الوجهة:</b> المديرية الإقليمية بمكناس', { direction: 'top', sticky: true });
+        
+        // Fit map bounds to show entire route with smooth padding
+        map.fitBounds(routeLayer.getBounds(), { padding: [70, 70], maxZoom: 15, animate: true });
+        
+        if (routeCard && routeDetails) {
+            routeDetails.innerHTML = `
+                <div style="font-weight: 600; color: #ffffff; margin-bottom: 8px; font-size: 0.95rem; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-bottom: 6px;">🏫 ${schoolName}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0,0,0,0.3); padding: 10px 12px; border-radius: 8px; margin-top: 6px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="text-align: center; border-left: 1px solid rgba(255,255,255,0.1);">
+                        <span style="color: #94a3b8; font-size: 0.75rem; display: block; margin-bottom: 2px;">المسافة / Distance</span>
+                        <strong style="color: #38bdf8; font-size: 1.1rem; font-weight: 700;">${distanceKm} كم</strong>
+                    </div>
+                    <div style="text-align: center;">
+                        <span style="color: #94a3b8; font-size: 0.75rem; display: block; margin-bottom: 2px;">المدة / Durée approx.</span>
+                        <strong style="color: #4ade80; font-size: 1.1rem; font-weight: 700;">~${durationMin} دقيقة</strong>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error("Route error:", e);
+        if (routeCard && routeDetails) {
+            routeDetails.innerHTML = `<div style="color: #ef4444; padding: 10px 0;">تعذر حساب المسار. / Erreur de calcul.</div>`;
+        }
+    }
+}
+
+function clearRouteToAdmin() {
+    routeLayer.clearLayers();
+    const routeCard = document.getElementById('route-card');
+    if (routeCard) routeCard.classList.add('hidden');
+}
+
+window.drawRouteToAdmin = drawRouteToAdmin;
+window.clearRouteToAdmin = clearRouteToAdmin;

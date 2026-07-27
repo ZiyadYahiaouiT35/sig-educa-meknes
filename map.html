@@ -69,6 +69,14 @@
                             <input type="checkbox" id="toggle-habitable" checked>
                             <span class="slider"></span> Zones Habitables
                         </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-city" checked>
+                            <span class="slider" style="background-color: #0284c7;"></span> Ville de Meknès (Municipalité)
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-communes" checked>
+                            <span class="slider" style="background-color: #64748b;"></span> Limites des Communes
+                        </label>
                         <hr>
                         <label class="toggle">
                             <input type="checkbox" id="toggle-schools-primary" checked>
@@ -121,6 +129,18 @@
 
         <!-- Map Container -->
         <main id="map"></main>
+
+        <!-- Route Info Panel -->
+        <div id="route-card" class="hidden" style="position: absolute; top: 20px; right: 20px; z-index: 2000; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(56, 189, 248, 0.5); padding: 16px 20px; border-radius: 12px; color: #f8fafc; box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 340px; max-width: calc(100vw - 40px); direction: rtl; text-align: right; font-family: 'Inter', sans-serif; transition: opacity 0.3s ease, transform 0.3s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.15); padding-bottom: 8px;">
+                <div style="font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
+                    <i class="fa-solid fa-route" style="font-size: 1.1rem; color: #38bdf8;"></i>
+                    <span>مسار نحو المديرية</span>
+                </div>
+                <button onclick="clearRouteToAdmin()" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-xmark"></i> إغلاق</button>
+            </div>
+            <div id="route-details" style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.6;"></div>
+        </div>
     </div>
 
     <!-- Scripts -->
@@ -130,7 +150,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=8"></script>
 </body>
 
 </html>
