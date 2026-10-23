@@ -60,6 +60,16 @@
 
                 <section class="controls-section">
                     <h3>Contrôles de la Carte</h3>
+                    <div style="margin-bottom: 14px;">
+                        <label for="basemap-select" style="display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500;">
+                            <i class="fa-solid fa-layer-group" style="color: #38bdf8; margin-right: 6px;"></i> Fond de carte :
+                        </label>
+                        <select id="basemap-select" style="width: 100%; padding: 8px 12px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; color: #ffffff; font-size: 0.85rem; outline: none; cursor: pointer; transition: border-color 0.2s;">
+                            <option value="voyager" selected>Carto Voyager (Couleurs - Recommandé)</option>
+                            <option value="positron">Carto Positron (Clair)</option>
+                            <option value="dark">Carto Dark Matter (Sombre)</option>
+                        </select>
+                    </div>
                     <div class="toggle-group">
                         <label class="toggle">
                             <input type="checkbox" id="toggle-border" checked>
@@ -122,7 +132,7 @@
             </div>
 
             <footer style="margin-top: auto;">
-                <p>Données fournies par OpenStreetMap</p>
+                <p>Données fournies par OpenStreetMap & CARTO</p>
                 <p>Rayon : 1.5km - 3.5km</p>
             </footer>
         </aside>
@@ -150,7 +160,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

@@ -27,10 +27,72 @@ legend.onAdd = function (map) {
 };
 legend.addTo(map);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+// Dedicated panes for optimal rendering and layer stacking order
+map.createPane('polygonsPane');
+map.getPane('polygonsPane').style.zIndex = '350';
+
+map.createPane('buffersPane');
+map.getPane('buffersPane').style.zIndex = '360';
+
+// CARTO API Key provided for raster basemaps
+const CARTO_API_KEY = 'cb1_4sr3_1_431752794a7e515ae75f4874';
+
+const baseMaps = {
+    voyager: L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }),
+    positron: L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }),
+    dark: L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+    })
+};
+
+let currentBaseLayer = baseMaps.voyager;
+currentBaseLayer.addTo(map);
+
+// Leaflet base layers control in top right
+const baseMapsControl = L.control.layers({
+    "Voyager (Couleurs)": baseMaps.voyager,
+    "Positron (Clair)": baseMaps.positron,
+    "Dark Matter (Sombre)": baseMaps.dark
+}, null, { position: 'topright', collapsed: true });
+baseMapsControl.addTo(map);
+
+// Sync with sidebar basemap selector
+const basemapSelect = document.getElementById('basemap-select');
+if (basemapSelect) {
+    basemapSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (baseMaps[val] && baseMaps[val] !== currentBaseLayer) {
+            map.removeLayer(currentBaseLayer);
+            currentBaseLayer = baseMaps[val];
+            currentBaseLayer.addTo(map);
+            currentBaseLayer.bringToBack();
+        }
+    });
+}
+
+map.on('baselayerchange', (e) => {
+    if (basemapSelect) {
+        if (e.layer === baseMaps.voyager) basemapSelect.value = 'voyager';
+        else if (e.layer === baseMaps.positron) basemapSelect.value = 'positron';
+        else if (e.layer === baseMaps.dark) basemapSelect.value = 'dark';
+    }
+    currentBaseLayer = e.layer;
+    currentBaseLayer.bringToBack();
+});
+
+// Invalidate size immediately to ensure full tile rendering on initial load
+setTimeout(() => { map.invalidateSize(); }, 200);
+window.addEventListener('resize', () => { map.invalidateSize(); });
 
 const starIcon = L.divIcon({
     html: '<i class="fa-solid fa-star fa-2x" style="color: #facc15; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); font-size: 24px;"></i>',
@@ -76,6 +138,7 @@ async function init() {
                 const borderData = await borderResponse.json();
                 const borderGeoJSON = osmtogeojson(borderData);
                 L.geoJSON(borderGeoJSON, {
+                    pane: 'polygonsPane',
                     filter: function(feature) { return feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon' || feature.geometry.type === 'LineString'); },
                     style: { color: '#0f172a', weight: 4, fill: false, opacity: 0.8 },
                     interactive: false
@@ -97,6 +160,7 @@ async function init() {
                     }
                 } catch (e) { console.warn("Dissolve residential error:", e); }
                 L.geoJSON(dissolvedRes, {
+                    pane: 'polygonsPane',
                     style: { color: '#ef4444', weight: 0.5, fillOpacity: 0.25 },
                     interactive: false
                 }).addTo(habitableLayer);
@@ -117,6 +181,7 @@ async function init() {
                     }
                 });
                 L.geoJSON(cityGeoJSON, {
+                    pane: 'polygonsPane',
                     filter: function(feature) { return feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon' || feature.geometry.type === 'LineString'); },
                     style: { color: '#0284c7', weight: 3, dashArray: '8, 6', fill: false, opacity: 0.85 },
                     interactive: false
@@ -131,6 +196,7 @@ async function init() {
                 const commData = await commResponse.json();
                 const commGeoJSON = osmtogeojson(commData);
                 L.geoJSON(commGeoJSON, {
+                    pane: 'polygonsPane',
                     filter: function(feature) {
                         if (!feature.geometry || !(feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon' || feature.geometry.type === 'LineString')) return false;
                         const str = JSON.stringify(feature).toLowerCase();
@@ -156,6 +222,7 @@ async function init() {
 
         document.getElementById('loading-indicator').classList.add('hidden');
         document.getElementById('dashboard-content').classList.remove('hidden');
+        map.invalidateSize();
 
         const secureData = sessionStorage.getItem('secureData');
         if (!secureData) {
@@ -347,15 +414,15 @@ function processCSVData(data) {
 
     if (buffers.primary.length > 0) {
         const dissolvedPrimary = turf.dissolve(turf.featureCollection(buffers.primary));
-        L.geoJSON(dissolvedPrimary, { style: { color: primaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferPrimaryLayer);
+        L.geoJSON(dissolvedPrimary, { pane: 'buffersPane', style: { color: primaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferPrimaryLayer);
     }
     if (buffers.secondary.length > 0) {
         const dissolvedSecondary = turf.dissolve(turf.featureCollection(buffers.secondary));
-        L.geoJSON(dissolvedSecondary, { style: { color: secondaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferSecondaryLayer);
+        L.geoJSON(dissolvedSecondary, { pane: 'buffersPane', style: { color: secondaryColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferSecondaryLayer);
     }
     if (buffers.high.length > 0) {
         const dissolvedHigh = turf.dissolve(turf.featureCollection(buffers.high));
-        L.geoJSON(dissolvedHigh, { style: { color: highColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferHighLayer);
+        L.geoJSON(dissolvedHigh, { pane: 'buffersPane', style: { color: highColor, weight: 1, fillOpacity: 0.2 }, interactive: false }).addTo(bufferHighLayer);
     }
 
     // Initialize Heatmap Layer
@@ -534,11 +601,13 @@ if (mobileMenuBtn && sidebar && mobileOverlay) {
     mobileMenuBtn.addEventListener('click', () => {
         sidebar.classList.add('show-sidebar');
         mobileOverlay.classList.add('active');
+        setTimeout(() => map.invalidateSize(), 300);
     });
 
     mobileOverlay.addEventListener('click', () => {
         sidebar.classList.remove('show-sidebar');
         mobileOverlay.classList.remove('active');
+        setTimeout(() => map.invalidateSize(), 300);
     });
 }
 
